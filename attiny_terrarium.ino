@@ -132,7 +132,7 @@ void loop() {
   oled.setCursor((screen_width / 4) + 1, 0);
   // oled.print("a");
   oled.print(alive);
-  oled.print(" alive        ");
+  oled.print(" alive    ");
 
 
 
