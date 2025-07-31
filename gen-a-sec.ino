@@ -1,3 +1,5 @@
+// USES ATTiny85
+
 #include <TinyWireM.h>
 #include <Tiny4kOLED.h>
 
@@ -65,16 +67,18 @@ void setup() {
 void loop() {
   uint16_t alive = 0;
 
-  oled.setCursor((screen_width / 4) + 1, 3);
+  uint16_t text_pad = 5;
+
+  oled.setCursor((screen_width / 4) + text_pad, 3);
   oled.print(duration);
   oled.print(" seconds");
 
-  oled.setCursor((screen_width / 4) + 1, 1);
+  oled.setCursor((screen_width / 4) + text_pad, 1);
   // oled.print("+");
   oled.print(born);
   oled.print(" born");
 
-  oled.setCursor((screen_width / 4) + 1, 2);
+  oled.setCursor((screen_width / 4) + text_pad, 2);
   // oled.print("-");
   oled.print(dead);
   oled.print(" dead");
@@ -129,7 +133,7 @@ void loop() {
   }
 
 
-  oled.setCursor((screen_width / 4) + 1, 0);
+  oled.setCursor((screen_width / 4) + text_pad, 0);
   // oled.print("a");
   oled.print(alive);
   oled.print(" alive    ");
