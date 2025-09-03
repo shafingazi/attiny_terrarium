@@ -14,7 +14,9 @@ uint16_t dead = 0;
 
 
 void setup() {
-  randomSeed(analogRead(3));
+  pinMode(4, INPUT_PULLUP);
+
+  randomSeed(analogRead(A3));
 
   // oled.begin();
   oled.begin(screen_width, screen_height, sizeof(tiny4koled_init_128x32br), tiny4koled_init_128x32br);    // Two rotations are supported, the begin() method sets the rotation to 1. oled.setRotation(0);
@@ -65,6 +67,9 @@ void setup() {
 }
 
 void loop() {
+
+  uint8_t button_value = digitalRead(4);
+
   uint16_t alive = 0;
 
   uint16_t text_pad = 5;
@@ -134,9 +139,12 @@ void loop() {
 
 
   oled.setCursor((screen_width / 4) + text_pad, 0);
-  // oled.print("a");
   oled.print(alive);
-  oled.print(" alive    ");
+  // oled.print(" alive    ");
+  oled.print(" alive");
+  oled.print("(");
+  oled.print(button_value);
+  oled.print(")    ");
 
 
 
@@ -144,7 +152,6 @@ void loop() {
   for (uint8_t i = 0; i < screen_width; i++) {
     this_gen[i] = next_gen[i];
   }
-
 
 
   duration++;
