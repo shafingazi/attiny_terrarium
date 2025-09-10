@@ -1,62 +1,95 @@
-// USES ATTiny85
-
 // NOTES
+// USES ATTiny85
 // RUN INTO ISSUES WHEN USING > 80% OF DYNAMIC MEMORY, NEED TO STAY UNDER
 // 404 BYTES IS ABSOLUTE MAXIMUM
 // WILL BE ABLE TO FREE UP MORE SPACE BY WRITING TO EEPROM
+// FLAGS TO CONSIDER FOR EEPROM: DEBUG, ROTATION/ORIENTATION
+
+/*
+
+
+
+                               EEPROM MAPPING                              
+                                                                           
+    0             15 16            31 32            47 48            63    
+   ┌────────────────┬────────────────┬────────────────┬────────────────┐   
+   │                │                │                │                │   
+   │                │                │                │                │   
+   │                │                │                │                │   
+192│                │                │                │                │255
+   ├────────────────┼────────────────┼────────────────┼────────────────┤   
+256│                │                │                │                │319
+   │                │                │                │                │   
+   │                │                │                │                │   
+   │                │                │                │                │   
+   └────────────────┴────────────────┴────────────────┴────────────────┘   
+    448          463 464          479 480          495 496          511    
+
+
+
+*/
 
 #include <TinyWireM.h>
 #include <Tiny4kOLED.h>
+#include <EEPROM.h>
 
-const uint8_t screen_width = 128;
-const uint8_t screen_height = 32;
+const uint8_t screen_width = 128;   // [1B] SCREEN DIMENSIONS
+const uint8_t screen_height = 32;   // [1B]
 
-uint8_t this_gen[screen_width];
-uint8_t next_gen[screen_width];
-uint16_t duration = 0;
-uint16_t born = 0;
-uint16_t dead = 0;
+uint8_t this_gen[screen_width];     // [1B x screen_width] STORES CURRENT GAME MAP
+uint8_t next_gen[screen_width];     // [1B x screen_width] STORES NEXT GAME MAP
+uint16_t duration = 0;              // [2B] STORES DURATION FOR CURRENT GAME IN SECONDS
+uint16_t born = 0;                  // [2B] STORES TOTAL SPAWNED CELLS FOR CURRENT GAME
+uint16_t dead = 0;                  // [2B] STORES TOTAL KILLED CELLS FOR CURRENT GAME
 
 // THIS BLOCK TAKES UP 16 BYTES!!!!
-unsigned long this_millis = 0;
-unsigned long last_millis = 0;
-unsigned long this_millis_button = 0;
-unsigned long last_millis_button = 0;
+unsigned long this_millis = 0;            // [4B] STORES CURRENT RUNTIME IN MILLISECONDS (MAX ~50 DAYS)
+unsigned long last_millis = 0;            // [4B] STORES PREVIOUS RUNTIME IN MILLISECONDS
+unsigned long this_millis_button = 0;     // [4B]
+unsigned long last_millis_button = 0;     // [4B]
 
-uint16_t interval = 1000;
-uint16_t duration_long_press = 2000;
+uint16_t interval = 1000;                 // [2B] PERIOD FOR GAME TO RUN, IN MILLISECONDS
+uint16_t duration_long_press = 2000;      // [3B] LONG-PRESS DURATION FOR BUTTON, IN MILLISECONDS
 
-unsigned long push_duration = 0;
-unsigned long last_push_duration = 0;
+uint16_t push_duration = 0;               // [2B] HOLDS CURRENT DURATION OF BUTTON PUSH, IN MILLISECONDS
+uint16_t last_push_duration = 0;          // [2B] HOLDS LAST DURATION OF BUTTON PUSH, IN MILLISECONDS
 
-bool flag_game = false;
-bool flag_menu = false;
-bool flag_rset = false;
+bool flag_game = false;                   // [1B] TRIPWIRE FLAG FOR GAME STATE, DETECTS BUTTON RELEASE
+bool flag_menu = false;                   // [1B] TRIPWIRE FLAG FOR MENU STATE, DETECTS BUTTON RELEASE
+bool flag_rset = false;                   // [1B] TRIPWIRE FLAG FOR RSET STATE, DETECTS BUTTON RELEASE
 
-enum states {
+enum states {                             // [?B] ENUM FOR STATES IN STATE MACHINE
   GAME,
   MENU,
   RSET,
   ROLL
 };
 
-uint8_t current_state = GAME;
+uint8_t current_state = GAME;             // [1B] STORES CURRENT STATE WITHIN STATE MACHINE
 
 void setup() {
-  pinMode(4, INPUT_PULLUP);
 
-  randomSeed(analogRead(A3));
+  // EEPROM.put(0, "alive");
+  
 
-  oled.begin(screen_width, screen_height, sizeof(tiny4koled_init_128x32br), tiny4koled_init_128x32br);    // Two rotations are supported, the begin() method sets the rotation to 1. oled.setRotation(0);
-  oled.setFont(FONT6X8);  // Two fonts are supplied with this library, FONT8X16 and FONT6X8, Other fonts are available from the TinyOLED-Fonts library
+  pinMode(4, INPUT_PULLUP);     // INITIALIZE PIN 4 FOR PUSH BUTTON
+
+  randomSeed(analogRead(A3));   // INITIALIZE RNG WITH NEW SEED
+
+  // TODO: IMPLEMENT ROTATION CHANGE
+  // Two rotations are supported, the begin() method sets the rotation to 1. oled.setRotation(0);
+  oled.begin(screen_width, screen_height, sizeof(tiny4koled_init_128x32br), tiny4koled_init_128x32br);
+  oled.setFont(FONT6X8);  // FONT8X16 ALSO AVAILABILE, ADDITIONAL FROM TinyOLED-Fonts LIBRARY
   oled.clear();
   
+  // POPULATE THE INITIAL GAME DATA WITH A RANDOM MAP
   for (uint8_t j = 0; j < screen_width; j++) {
     for (uint8_t i = 0; i < 8; i++) {
       bitWrite(this_gen[j], i, random(0, 2));
     }
   }
 
+  // DRAW THE MAP DATA ONTO THE SCREEN
   for (uint8_t i = 0; i < screen_width / 4; i++) {
     oled.setCursor(i, 0);
     oled.startData();
@@ -79,8 +112,7 @@ void setup() {
     oled.endData();
   }
 
-  oled.on();
-  delay(1000);
+  oled.on();  // TURNS ON DISPLAY WITH SENT DATA
 
 }
 
@@ -150,8 +182,10 @@ void loop() {
 
         oled.setCursor((screen_width / 4) + text_pad, 0);
         oled.print(alive);
-        // oled.print(this_millis);
-        oled.print(" alive");
+        char alive_text[5];
+        EEPROM.get(0, alive_text);
+        oled.print(alive_text);
+        // oled.print(" alive");
         oled.clearToEOL();
 
 
@@ -184,37 +218,6 @@ void loop() {
 
       if (flag_menu && push_duration >= duration_long_press) {   // MENU > GAME
         flag_menu = false;
-
-
-
-
-        // // flag_rset = false;
-
-        // alive = 0;
-        // born = 0;
-        // dead = 0;
-        // duration = 0;
-
-        // // // RESET GEN ARRAYS
-        // // for (uint8_t i = 0; i < screen_width; i++) {
-        // //   this_gen[i] = 0;
-        // //   next_gen[i] = 0;
-        // // }
-
-        // randomSeed(analogRead(A3));
-
-        // for (uint8_t j = 0; j < screen_width; j++) {
-        //   for (uint8_t i = 0; i < 8; i++) {
-        //     bitWrite(this_gen[j], i, random(0, 2));
-        //   }
-        // }
-
-
-
-
-
-
-
 
 
         current_state = GAME;
