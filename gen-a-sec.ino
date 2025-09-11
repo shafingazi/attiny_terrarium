@@ -6,6 +6,8 @@
 // FLAGS TO CONSIDER FOR EEPROM: DEBUG, ROTATION/ORIENTATION
 
 /*
+  TODO: MAKE SEPARATE FILE FOR WRITING EEPROM MAP TO MEMORY (ONCE!)
+  TODO: MAKE PROGRESS BAR RENDER ON ALL SCREENS (LOOK INTO setPage?)
 
 
 
@@ -13,10 +15,10 @@
                                                                            
     0             15 16            31 32            47 48            63    
    ┌────────────────┬────────────────┬────────────────┬────────────────┐   
-   │                │                │                │                │   
-   │                │                │                │                │   
-   │                │                │                │                │   
-192│                │                │                │                │255
+   │_alive          │                │                │                │   
+   │_born           │                │                │                │   
+   │_dead           │                │                │                │   
+192│_seconds        │                │                │                │255
    ├────────────────┼────────────────┼────────────────┼────────────────┤   
 256│                │                │                │                │319
    │                │                │                │                │   
@@ -69,7 +71,11 @@ uint8_t current_state = GAME;             // [1B] STORES CURRENT STATE WITHIN ST
 
 void setup() {
 
-  // EEPROM.put(0, "alive");
+  // EEPROM.put(0, " alive");
+  // EEPROM.put(64, " born");
+  // EEPROM.put(128, " dead");
+  // EEPROM.put(192, " seconds");
+
   
 
   pinMode(4, INPUT_PULLUP);     // INITIALIZE PIN 4 FOR PUSH BUTTON
@@ -161,31 +167,32 @@ void loop() {
       // GAME
       if (this_millis - last_millis >= interval) {
 
+        // SECONDS
         oled.setCursor((screen_width / 4) + text_pad, 3);
         oled.print(duration);
-        oled.print(" seconds");
+        print_from_eeprom(192, 8);
         oled.clearToEOL();
 
+        // BORN
         oled.setCursor((screen_width / 4) + text_pad, 1);
         oled.print(born);
-        oled.print(" born");
+        print_from_eeprom(64, 5);
         oled.clearToEOL();
 
+        // DEAD
         oled.setCursor((screen_width / 4) + text_pad, 2);
         oled.print(dead);
-        oled.print(" dead");
+        print_from_eeprom(128, 5);
         oled.clearToEOL();
 
         alive = play_play_grid(alive);
 
         draw_play_grid();
 
+        // ALIVE
         oled.setCursor((screen_width / 4) + text_pad, 0);
         oled.print(alive);
-        char alive_text[5];
-        EEPROM.get(0, alive_text);
-        oled.print(alive_text);
-        // oled.print(" alive");
+        print_from_eeprom(0, 6);
         oled.clearToEOL();
 
 
@@ -198,8 +205,9 @@ void loop() {
         last_millis = this_millis;
       }
 
-      oled.setCursor(screen_width - 10, 0);
-      oled.print(button_value);
+      // PRINT button_value TO TOP RIGHT CORNER
+      // oled.setCursor(screen_width - 10, 0);
+      // oled.print(button_value);
       
 
       break;
@@ -216,6 +224,15 @@ void loop() {
       // THIS DOESN'T WORK AT THE SAME TIME AS push_duration's calc?
       if (button_value == 1) flag_menu = true;   // BUTTON RELEASE TRIPS FLAG
 
+      // PROGRESS BAR
+      if (flag_menu && 0 < push_duration && push_duration < duration_long_press) {
+        oled.setCursor(0, 3);
+        oled.fillLength(B10000000, (8 * push_duration) / screen_width);
+      } else {
+        oled.setCursor(0, 3);
+        oled.fillLength(B00000000, screen_width);
+      }
+
       if (flag_menu && push_duration >= duration_long_press) {   // MENU > GAME
         flag_menu = false;
 
@@ -229,9 +246,10 @@ void loop() {
 
       if (button_value == 1) flag_rset = true;   // BUTTON RELEASE TRIPS FLAG
 
+      // PROGRESS BAR
       if (flag_rset && 0 < push_duration && push_duration < duration_long_press) {
         oled.setCursor(0, 3);
-        oled.fillLength(B10000000, (8 * push_duration) / 125);
+        oled.fillLength(B10000000, (8 * push_duration) / screen_width);
       }
 
       if (flag_rset && push_duration >= duration_long_press) {  // RSET > GAME
@@ -285,8 +303,9 @@ void loop() {
       break;
   }
 
-  oled.setCursor(screen_width - 10, 3);
-  oled.print(current_state);
+  // PRINTS STATE INT IN BOT RIGHT CORNER
+  // oled.setCursor(screen_width - 10, 3);
+  // oled.print(current_state);
 
   last_millis_button = this_millis_button;
 
@@ -446,3 +465,32 @@ uint16_t play_play_grid(uint16_t alive) {
 
 }
 
+void print_from_eeprom(uint8_t idx, uint8_t size) {
+
+  for (uint8_t i = 0; i < size; i++) {
+    oled.print(static_cast<char>(EEPROM.read(idx + i)));
+  }
+
+  return;
+}
+
+
+// void drawProgressBar(uint8_t x, uint8_t y, uint8_t length) {
+//   oled.bitmap(0, 64, length, 64, const uint8_t *bitmap)
+//   for (uint8_t i = 0; i < length; i++) {
+//     oled.drawPixel(x + i, y);
+//   }
+// }
+
+
+
+// char* read_eeprom(uint8_t idx, uint8_t size) {
+
+//   char text[size];
+//   for (uint8_t i = 0; i < size; i++) {
+//     text[i] = static_cast<char>(EEPROM.read(idx + i));
+//   }
+
+//   return text;
+
+// }
